@@ -1,5 +1,5 @@
 Flask==2.3.3
 requests==2.31.0
 beautifulsoup4==4.12.2
-aiohttp==3.8.5
+aiohttp==3.12.15
 python-dotenv==1.0.0
