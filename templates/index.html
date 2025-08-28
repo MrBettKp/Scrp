@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy Checker & Tester</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Proxy Checker Logo" class="logo">
+        <h1>Proxy Checker & Tester</h1>
+        <p class="subtitle">Test and validate proxy servers for your web scraping projects</p>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Check Single Proxy</h2>
+            <div class="form-group">
+                <label for="proxy">Proxy (IP:PORT):</label>
+                <input type="text" id="proxy" placeholder="192.168.1.1:8080">
+            </div>
+            <div class="form-group">
+                <label for="test_url">Test URL:</label>
+                <input type="text" id="test_url" value="https://httpbin.org/ip" placeholder="URL to test with proxy">
+            </div>
+            <button onclick="checkProxy()">Check Proxy</button>
+            
+            <div class="loading" id="singleLoading">
+                <div class="spinner"></div>
+                <p>Testing proxy...</p>
+            </div>
+            
+            <div class="results" id="singleResult"></div>
+        </div>
+
+        <div class="card">
+            <h2>Scrape & Test Proxies</h2>
+            <div class="form-group">
+                <label for="source">Proxy Source (optional):</label>
+                <input type="text" id="source" placeholder="Leave empty for default sources">
+            </div>
+            <div class="form-group">
+                <label for="scrape_test_url">Test URL:</label>
+                <input type="text" id="scrape_test_url" value="https://httpbin.org/ip" placeholder="URL to test with proxies">
+            </div>
+            <button onclick="scrapeProxies()">Scrape & Test Proxies</button>
+            
+            <div class="loading" id="scrapeLoading">
+                <div class="spinner"></div>
+                <p>Scraping and testing proxies...</p>
+            </div>
+            
+            <div class="results" id="scrapeResult"></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Proxy Checker & Tester &copy; 2023 | Built with Python Flask</p>
+    </div>
+
+    <script>
+        function checkProxy() {
+            const proxy = document.getElementById('proxy').value;
+            const testUrl = document.getElementById('test_url').value;
+            const resultDiv = document.getElementById('singleResult');
+            const loading = document.getElementById('singleLoading');
+            
+            if (!proxy) {
+                resultDiv.innerHTML = '<div class="result-item error">Please enter a proxy</div>';
+                return;
+            }
+            
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+            
+            fetch('/check_proxy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({proxy, test_url: testUrl})
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="result-item error">Error: ${data.error}</div>`;
+                    return;
+                }
+                
+                if (data.status === 'working') {
+                    resultDiv.innerHTML = `
+                        <div class="result-item working">
+                            <strong>Proxy:</strong> ${data.proxy}<br>
+                            <strong>Status:</strong> ${data.status}<br>
+                            <strong>Response Time:</strong> ${data.response_time}s<br>
+                            <strong>Status Code:</strong> ${data.status_code}<br>
+                            <div class="response-content">
+                                <strong>Response:</strong><br>${data.response_content || 'No content'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result-item error">
+                            <strong>Proxy:</strong> ${data.proxy}<br>
+                            <strong>Status:</strong> ${data.status}<br>
+                            <strong>Error:</strong> ${data.error}<br>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                resultDiv.innerHTML = `<div class="result-item error">Request failed: ${error}</div>`;
+            });
+        }
+        
+        function scrapeProxies() {
+            const source = document.getElementById('source').value;
+            const testUrl = document.getElementById('scrape_test_url').value;
+            const resultDiv = document.getElementById('scrapeResult');
+            const loading = document.getElementById('scrapeLoading');
+            
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+            
+            fetch('/scrape_proxies', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({source, test_url: testUrl})
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="result-item error">Error: ${data.error}</div>`;
+                    return;
+                }
+                
+                let html = `
+                    <div class="result-item">
+                        <strong>Total Proxies Found:</strong> ${data.total_found}<br>
+                        <strong>Working Proxies:</strong> ${data.working.length}<br>
+                        <strong>Failed Proxies:</strong> ${data.failed.length}
+                    </div>
+                `;
+                
+                if (data.working.length > 0) {
+                    html += '<h3>Working Proxies:</h3>';
+                    data.working.forEach(proxy => {
+                        html += `
+                            <div class="result-item working">
+                                <strong>Proxy:</strong> ${proxy.proxy}<br>
+                                <strong>Response Time:</strong> ${proxy.response_time}s<br>
+                                <strong>Status Code:</strong> ${proxy.status_code}
+                            </div>
+                        `;
+                    });
+                }
+                
+                if (data.failed.length > 0) {
+                    html += '<h3>Failed Proxies:</h3>';
+                    data.failed.forEach(proxy => {
+                        html += `
+                            <div class="result-item error">
+                                <strong>Proxy:</strong> ${proxy.proxy}<br>
+                                <strong>Error:</strong> ${proxy.error}
+                            </div>
+                        `;
+                    });
+                }
+                
+                resultDiv.innerHTML = html;
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                resultDiv.innerHTML = `<div class="result-item error">Request failed: ${error}</div>`;
+            });
+        }
+    </script>
+</body>
+  </html>
